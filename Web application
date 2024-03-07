@@ -1,0 +1,53 @@
+from flask import Flask, request, jsonify
+import sqlite3
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your_secret_key'
+
+class UserDB:
+    def __init__(self, db_file='users.db'):
+        self.conn = sqlite3.connect(db_file)
+        self.cur = self.conn.cursor()
+        self.cur.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT)')
+        self.conn.commit()
+
+    def create_user(self, username, password):
+        self.cur.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+        self.conn.commit()
+
+    def check_user(self, username, password):
+        self.cur.execute('SELECT id FROM users WHERE username = ? AND password = ?', (username, password))
+        result = self.cur.fetchone()
+        if result:
+            return True
+        else:
+            return False
+
+user_db = UserDB()
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    if username and password:
+        user_db.create_user(username, password)
+        return jsonify({'message': 'User registered successfully'})
+    else:
+        return jsonify({'message': 'Invalid username or password'}), 400
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    if username and password:
+        if user_db.check_user(username, password):
+            return jsonify({'message': 'Login successful'})
+        else:
+            return jsonify({'message': 'Invalid username or password'}), 401
+    else:
+        return jsonify({'message': 'Invalid username or password'}), 400
+
+if __name__ == '__main__':
+    app.run(debug=True)
