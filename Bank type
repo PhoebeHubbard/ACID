@@ -1,0 +1,49 @@
+import sqlite3
+
+class Bank:
+    def __init__(self, db_file='bank.db'):
+        self.conn = sqlite3.connect(db_file)
+        self.cur = self.conn.cursor()
+        self.cur.execute('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, name TEXT, balance REAL)')
+        self.conn.commit()
+
+    def create_account(self, name, balance):
+        self.cur.execute('INSERT INTO accounts (name, balance) VALUES (?, ?)', (name, balance))
+        self.conn.commit()
+
+    def get_balance(self, account_id):
+        self.cur.execute('SELECT balance FROM accounts WHERE id = ?', (account_id,))
+        result = self.cur.fetchone()
+        if result:
+            return result[0]
+        else:
+            return None
+
+    def transfer(self, from_account_id, to_account_id, amount):
+        self.cur.execute('BEGIN TRANSACTION')
+        from_balance = self.get_balance(from_account_id)
+        to_balance = self.get_balance(to_account_id)
+        if from_balance is not None and to_balance is not None and from_balance >= amount:
+            self.cur.execute('UPDATE accounts SET balance = balance - ? WHERE id = ?', (amount, from_account_id))
+            self.cur.execute('UPDATE accounts SET balance = balance + ? WHERE id = ?', (amount, to_account_id))
+            self.cur.execute('COMMIT')
+            return True
+        else:
+            self.cur.execute('ROLLBACK')
+            return False
+
+# Usage Example
+bank = Bank()
+bank.create_account('Alice', 1000)
+bank.create_account('Bob', 500)
+
+print('Before transfer:')
+print('Alice balance:', bank.get_balance(1))
+print('Bob balance:', bank.get_balance(2))
+
+success = bank.transfer(1, 2, 200)  # Transfer 200 from Alice to Bob
+
+print('\nAfter transfer:')
+print('Alice balance:', bank.get_balance(1))
+print('Bob balance:', bank.get_balance(2))
+print('Transfer successful:', success)
